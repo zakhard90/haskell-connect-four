@@ -14,9 +14,10 @@ module Main where
 -- [ ] Connect 4 / win
 -- [ ] Game over
 -- [ ] Random opponent
+
+import Data.List (sortOn)
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
-import Data.List (sortOn)
 
 data Game = Game
   { cursorPosition :: (Float, Float)
@@ -38,7 +39,7 @@ cols :: Float
 cols = 7
 
 radius :: Float
-radius = 10
+radius = step / 3
 
 frames :: Int
 frames = 25
@@ -46,20 +47,20 @@ frames = 25
 speed :: Float
 speed = 1
 
-windowWidth :: Int
-windowWidth = 210
+windowWidth :: Float
+windowWidth = cols * step
 
-windowHeight :: Int
-windowHeight = 330
+windowHeight :: Float
+windowHeight = (rows + 5) * step
 
 roof :: Float
-roof = subtract radius $ fromIntegral $ div windowHeight 2
+roof = subtract radius $ windowHeight / 2
 
 ground :: Float
 ground = negate roof
 
 rightEdge :: Float
-rightEdge = subtract (step / 2) $ fromIntegral $ div windowWidth 2
+rightEdge = subtract (step / 2) $ windowWidth / 2
 
 leftEdge :: Float
 leftEdge = negate rightEdge
@@ -69,7 +70,7 @@ main = do
   play windowDisplay white frames initGame renderGame inputHandler runGame
 
 windowDisplay :: Display
-windowDisplay = InWindow "Window" (windowWidth, windowHeight) (100, 100)
+windowDisplay = InWindow "Window" (round windowWidth, round windowHeight) (100, 100)
 
 cursor :: Float -> Float -> Picture
 cursor x y = translate x y (Circle radius)
@@ -127,11 +128,11 @@ initGame =
 renderGame :: Game -> Picture
 renderGame game
   | isGameOver game = displayTextCenter "Game over"
-  | isWinner game = displayTextCenter "You won!"
+  | isWinner game = displayTextCenter "You did it!"
   | otherwise =
     Pictures
       [ refGrid cols rows (Color (greyN 0.95) $ Circle $ radius + 4)
-      , gameGrid game cols rows $ ThickCircle 4 10
+      , gameGrid game cols rows $ ThickCircle (radius / 2) radius
       , uncurry cursor $ cursorPosition game
       , displayPlayer game
       ]
@@ -159,7 +160,7 @@ calculateDepth row = negate $ row * step
 getNextInColumn :: Float -> [(Float, Float)] -> Float
 getNextInColumn _ [] = calculateDepth (rows - 1)
 getNextInColumn x ls
-  | x == fst (head ls) = snd (head (reverse $ sortOn snd $ filter ((==x).fst) ls)) + step
+  | x == fst (head ls) = snd (head (reverse $ sortOn snd $ filter ((== x) . fst) ls)) + step
   | otherwise = getNextInColumn x (tail ls)
 
 placePiece :: Float -> [(Float, Float)] -> [(Float, Float)] -> [(Float, Float)]
@@ -167,8 +168,35 @@ placePiece x as ls
   | columnContains x as = (x, getNextInColumn x as) : ls
   | otherwise = (x, calculateDepth (rows - 1)) : ls
 
+checkWin :: [(Float, Float)] -> Bool
+checkWin [] = False
+checkWin xs
+  | length xs < 4 = False
+  | otherwise = checkColumn xs || checkRow xs || checkDiag xs
+
+checkColumn :: [(Float, Float)] -> Bool
+checkColumn [] = False
+checkColumn ls = True
+
+
+-- sortOn snd $ filter ((==x).fst) ls
+
+filterByColumn :: Float -> [(Float, Float)] -> [(Float, Float)]
+filterByColumn x [] = []
+filterByColumn x ls = sortOn snd $ filter ((== x * step) . fst) ls
+
+filterByRow :: Float -> [(Float, Float)] -> [(Float, Float)]
+filterByRow x [] = []
+filterByRow x ls = sortOn fst $ filter ((== x * step) . snd) ls
+
+checkRow :: [(Float, Float)] -> Bool
+checkRow ls = True
+
+checkDiag :: [(Float, Float)] -> Bool
+checkDiag ls = True
+
 displayTextTop :: String -> Picture
-displayTextTop s = Translate (-90) 140 $ Scale 0.1 0.1 $ Text s
+displayTextTop s = Translate (negate $ step * 3) (step * 5) $ Scale 0.1 0.1 $ Text s
 
 displayTextCenter :: String -> Picture
 displayTextCenter s = Translate (-40) 0 $ Scale 0.1 0.1 $ Text s
@@ -203,7 +231,7 @@ inputHandler (EventKey (SpecialKey KeyLeft) Down _ _) game =
 inputHandler _ game = game
 
 runGame :: Float -> Game -> Game
-runGame _ game
+runGame time game
   | isGameOver game = game
   | isWinner game = game
   | otherwise =
@@ -227,4 +255,8 @@ runGame _ game
           if snd (cursorPosition game) < speed
             then not $ isPlayersTurn game
             else isPlayersTurn game
+      , isGameOver =
+          checkWin (opponentPieces game)
+      , isWinner =
+          checkWin (playerPieces game)
       }
