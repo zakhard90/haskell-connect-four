@@ -4,29 +4,38 @@
 module Main where
 
 -- [x] Game board
--- [x] Inputs 
+-- [x] Inputs
 -- [x] Animations and movement restrictions
 -- [x] Draw grid
 -- [x] Game state
 -- [x] Display text
--- [ ] Place piece action
--- [ ] Alternate player turns
+-- [x] Place piece action
+-- [x] Alternate player turns
 -- [ ] Connect 4 / win
 -- [ ] Game over
-import           Graphics.Gloss
-import           Graphics.Gloss.Interface.Pure.Game
+-- [ ] Random opponent
+import Graphics.Gloss
+import Graphics.Gloss.Interface.Pure.Game
+import Data.List (sortOn)
 
-data Game = Game { cursorPosition :: (Float, Float)
-                 , isPlayersTurn :: Bool
-                 , playerPieces :: [(Float, Float)]
-                 , opponentPieces :: [(Float, Float)]
-                 , isWinner :: Bool
-                 , isGameOver :: Bool
-                 }
+data Game = Game
+  { cursorPosition :: (Float, Float)
+  , isPlayersTurn :: Bool
+  , playerPieces :: [(Float, Float)]
+  , opponentPieces :: [(Float, Float)]
+  , isWinner :: Bool
+  , isGameOver :: Bool
+  }
   deriving (Read, Show)
 
 step :: Float
 step = 30
+
+rows :: Float
+rows = 6
+
+cols :: Float
+cols = 7
 
 radius :: Float
 radius = 10
@@ -68,44 +77,64 @@ cursor x y = translate x y (Circle radius)
 repeatBlank :: Picture -> [(Float, Float)] -> [Picture]
 repeatBlank piece = foldr (\c -> (:) (uncurry Translate c piece)) [piece]
 
-posArray :: Int -> Int -> [(Float, Float)]
-posArray cols rows =
-  [(x, y)
-  | x <- map (* step) [fromIntegral firstCol .. fromIntegral lastCol]
-  , y <- map (* step) [fromIntegral firstRow .. fromIntegral lastRow]]
-  where
-    lastCol = div (cols - 1) 2
+repeatPiece :: Game -> Picture -> [(Float, Float)] -> [Picture]
+repeatPiece game piece [] = []
+repeatPiece game piece xs
+  | head xs `elem` playerPieces game =
+    uncurry Translate (head xs) (Color black piece) :
+    repeatPiece game piece (tail xs)
+  | head xs `elem` opponentPieces game =
+    uncurry Translate (head xs) (Color red piece) :
+    repeatPiece game piece (tail xs)
+  | otherwise =
+    uncurry Translate (head xs) (Color (greyN 0.92) piece) :
+    repeatPiece game piece (tail xs)
 
-    firstCol = negate lastCol
+--foldr (\(x, y) -> (:) (uncurry Translate (x, y) piece)) [piece] posMatrix
+posMatrix :: Float -> Float -> [(Float, Float)]
+posMatrix cols rows =
+  [ (x, y)
+  | x <- map (* step) [firstCol .. lastCol]
+  , y <- map (* step) [firstRow .. lastRow]
+  ]
+ where
+  lastCol = (cols - 1) / 2
 
-    lastRow = 0
+  firstCol = negate lastCol
 
-    firstRow = negate $ rows - 1
+  lastRow = 0
 
-gameGrid :: Int -> Int -> Picture -> Picture
-gameGrid c r p = Pictures $ repeatBlank p $ posArray c r
+  firstRow = negate $ rows - 1
 
-refGrid :: Int -> Int -> Picture -> Picture
-refGrid c r p = Pictures $ repeatBlank p $ posArray c r
+gameGrid :: Game -> Float -> Float -> Picture -> Picture
+gameGrid game cols rows piece =
+  Pictures $ repeatPiece game piece $ posMatrix cols rows
+
+refGrid :: Float -> Float -> Picture -> Picture
+refGrid c r p = Pictures $ repeatBlank p $ posMatrix c r
 
 initGame :: Game
-initGame = Game { cursorPosition = (0, roof)
-                , isPlayersTurn = True
-                , playerPieces = []
-                , opponentPieces = []
-                , isWinner = False
-                , isGameOver = False
-                }
+initGame =
+  Game
+    { cursorPosition = (0, roof)
+    , isPlayersTurn = True
+    , playerPieces = []
+    , opponentPieces = []
+    , isWinner = False
+    , isGameOver = False
+    }
 
 renderGame :: Game -> Picture
 renderGame game
   | isGameOver game = displayTextCenter "Game over"
   | isWinner game = displayTextCenter "You won!"
-  | otherwise = Pictures
-    [ gameGrid 7 6 (Color (greyN 0.92) $ ThickCircle 4 10)
-    , refGrid 7 6 (Color (greyN 0.95) $ Circle $ radius + 4)
-    , uncurry cursor $ cursorPosition game
-    , displayPlayer game]
+  | otherwise =
+    Pictures
+      [ refGrid cols rows (Color (greyN 0.95) $ Circle $ radius + 4)
+      , gameGrid game cols rows $ ThickCircle 4 10
+      , uncurry cursor $ cursorPosition game
+      , displayPlayer game
+      ]
 
 boundedWidth :: Float -> Float
 boundedWidth x
@@ -118,10 +147,25 @@ boundedHeight y
   | y < ground = ground
   | otherwise = y
 
-gravityPull :: Float -> Float
-gravityPull y
-  | y < speed = roof
-  | otherwise = y - speed
+columnContains :: Float -> [(Float, Float)] -> Bool
+columnContains _ [] = False
+columnContains x ls
+  | x == fst (head ls) = True
+  | otherwise = columnContains x (tail ls)
+
+calculateDepth :: Float -> Float
+calculateDepth row = negate $ row * step
+
+getNextInColumn :: Float -> [(Float, Float)] -> Float
+getNextInColumn _ [] = calculateDepth (rows - 1)
+getNextInColumn x ls
+  | x == fst (head ls) = snd (head (reverse $ sortOn snd $ filter ((==x).fst) ls)) + step
+  | otherwise = getNextInColumn x (tail ls)
+
+placePiece :: Float -> [(Float, Float)] -> [(Float, Float)] -> [(Float, Float)]
+placePiece x as ls
+  | columnContains x as = (x, getNextInColumn x as) : ls
+  | otherwise = (x, calculateDepth (rows - 1)) : ls
 
 displayTextTop :: String -> Picture
 displayTextTop s = Translate (-90) 140 $ Scale 0.1 0.1 $ Text s
@@ -136,17 +180,26 @@ displayPlayer game
 
 inputHandler :: Event -> Game -> Game
 inputHandler (EventKey (SpecialKey KeyDown) Down _ _) game =
-  game { cursorPosition = ( fst $ cursorPosition game
-                          , boundedHeight (snd (cursorPosition game) - step))
-       }
+  game
+    { cursorPosition =
+        ( fst $ cursorPosition game
+        , boundedHeight (snd (cursorPosition game) - step)
+        )
+    }
 inputHandler (EventKey (SpecialKey KeyRight) Down _ _) game =
-  game { cursorPosition = ( boundedWidth (fst (cursorPosition game) + step)
-                          , snd $ cursorPosition game)
-       }
+  game
+    { cursorPosition =
+        ( boundedWidth (fst (cursorPosition game) + step)
+        , snd $ cursorPosition game
+        )
+    }
 inputHandler (EventKey (SpecialKey KeyLeft) Down _ _) game =
-  game { cursorPosition = ( boundedWidth (fst (cursorPosition game) - step)
-                          , snd $ cursorPosition game)
-       }
+  game
+    { cursorPosition =
+        ( boundedWidth (fst (cursorPosition game) - step)
+        , snd $ cursorPosition game
+        )
+    }
 inputHandler _ game = game
 
 runGame :: Float -> Game -> Game
@@ -154,6 +207,24 @@ runGame _ game
   | isGameOver game = game
   | isWinner game = game
   | otherwise =
-    game { cursorPosition = ( fst $ cursorPosition game
-                            , gravityPull $ snd $ cursorPosition game)
-         }
+    game
+      { cursorPosition =
+          if snd (cursorPosition game) < speed
+            then (fst $ cursorPosition game, roof)
+            else
+              ( fst $ cursorPosition game
+              , snd (cursorPosition game) - speed
+              )
+      , playerPieces =
+          if isPlayersTurn game && snd (cursorPosition game) < speed
+            then placePiece (fst $ cursorPosition game) (playerPieces game ++ opponentPieces game) (playerPieces game)
+            else playerPieces game
+      , opponentPieces =
+          if not (isPlayersTurn game) && snd (cursorPosition game) < speed
+            then placePiece (fst $ cursorPosition game) (playerPieces game ++ opponentPieces game) (opponentPieces game)
+            else opponentPieces game
+      , isPlayersTurn =
+          if snd (cursorPosition game) < speed
+            then not $ isPlayersTurn game
+            else isPlayersTurn game
+      }
