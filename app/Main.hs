@@ -15,9 +15,15 @@ module Main where
 -- [ ] Game over
 -- [ ] Random opponent
 
-import Data.List (sortOn)
+import Data.List (group, sortOn)
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
+
+main :: IO ()
+main = do
+  print $ getLongestStreak [-90, -60, -30, 0, 60, 90]
+  print $ filterByColumn 1 [(30, 90), (30, -30), (90, 0)]
+  play windowDisplay white frames initGame renderGame inputHandler runGame
 
 data Game = Game
   { cursorPosition :: (Float, Float)
@@ -65,9 +71,17 @@ rightEdge = subtract (step / 2) $ windowWidth / 2
 leftEdge :: Float
 leftEdge = negate rightEdge
 
-main :: IO ()
-main = do
-  play windowDisplay white frames initGame renderGame inputHandler runGame
+lastCol :: Float
+lastCol = (cols - 1) / 2
+
+firstCol :: Float
+firstCol = negate lastCol
+
+lastRow :: Float
+lastRow = 0
+
+firstRow :: Float
+firstRow = negate $ rows - 1
 
 windowDisplay :: Display
 windowDisplay = InWindow "Window" (round windowWidth, round windowHeight) (100, 100)
@@ -80,16 +94,16 @@ repeatBlank piece = foldr (\c -> (:) (uncurry Translate c piece)) [piece]
 
 repeatPiece :: Game -> Picture -> [(Float, Float)] -> [Picture]
 repeatPiece game piece [] = []
-repeatPiece game piece xs
-  | head xs `elem` playerPieces game =
-    uncurry Translate (head xs) (Color black piece) :
-    repeatPiece game piece (tail xs)
-  | head xs `elem` opponentPieces game =
-    uncurry Translate (head xs) (Color red piece) :
-    repeatPiece game piece (tail xs)
+repeatPiece game piece ls@(x : xs)
+  | x `elem` playerPieces game =
+    uncurry Translate x (Color black piece) :
+    repeatPiece game piece xs
+  | x `elem` opponentPieces game =
+    uncurry Translate x (Color red piece) :
+    repeatPiece game piece xs
   | otherwise =
-    uncurry Translate (head xs) (Color (greyN 0.92) piece) :
-    repeatPiece game piece (tail xs)
+    uncurry Translate x (Color (greyN 0.92) piece) :
+    repeatPiece game piece xs
 
 --foldr (\(x, y) -> (:) (uncurry Translate (x, y) piece)) [piece] posMatrix
 posMatrix :: Float -> Float -> [(Float, Float)]
@@ -98,14 +112,6 @@ posMatrix cols rows =
   | x <- map (* step) [firstCol .. lastCol]
   , y <- map (* step) [firstRow .. lastRow]
   ]
- where
-  lastCol = (cols - 1) / 2
-
-  firstCol = negate lastCol
-
-  lastRow = 0
-
-  firstRow = negate $ rows - 1
 
 gameGrid :: Game -> Float -> Float -> Picture -> Picture
 gameGrid game cols rows piece =
@@ -150,18 +156,18 @@ boundedHeight y
 
 columnContains :: Float -> [(Float, Float)] -> Bool
 columnContains _ [] = False
-columnContains x ls
-  | x == fst (head ls) = True
-  | otherwise = columnContains x (tail ls)
+columnContains n ls@(x : xs)
+  | n == fst x = True
+  | otherwise = columnContains n xs
 
 calculateDepth :: Float -> Float
 calculateDepth row = negate $ row * step
 
 getNextInColumn :: Float -> [(Float, Float)] -> Float
 getNextInColumn _ [] = calculateDepth (rows - 1)
-getNextInColumn x ls
-  | x == fst (head ls) = snd (head (reverse $ sortOn snd $ filter ((== x) . fst) ls)) + step
-  | otherwise = getNextInColumn x (tail ls)
+getNextInColumn n ls@(x : xs)
+  | n == fst x = snd (last (sortOn snd $ filter ((== n) . fst) ls)) + step
+  | otherwise = getNextInColumn n xs
 
 placePiece :: Float -> [(Float, Float)] -> [(Float, Float)] -> [(Float, Float)]
 placePiece x as ls
@@ -172,14 +178,46 @@ checkWin :: [(Float, Float)] -> Bool
 checkWin [] = False
 checkWin xs
   | length xs < 4 = False
-  | otherwise = checkColumn xs || checkRow xs || checkDiag xs
+  | otherwise = checkWinColumn xs || checkWinRow xs || checkWinDiag xs
 
-checkColumn :: [(Float, Float)] -> Bool
-checkColumn [] = False
-checkColumn ls = True
+checkWinColumn :: [(Float, Float)] -> Bool
+checkWinColumn [] = False
+checkWinColumn ls = checkWinColumnValues [firstCol .. lastCol] ls
 
+checkWinColumnValues :: [Float] -> [(Float, Float)] -> Bool
+checkWinColumnValues _ [] = False
+checkWinColumnValues [] ls = False
+checkWinColumnValues ks@(x : xs) ls
+  | longestStreak >= 4 = True
+  | otherwise = checkWinColumnValues xs ls
+ where
+  longestStreak = getLongestStreak $ reduceToRowValue $ filterByColumn x ls
 
--- sortOn snd $ filter ((==x).fst) ls
+checkWinRow :: [(Float, Float)] -> Bool
+checkWinRow [] = False
+checkWinRow ls = checkWinRowValues [firstRow .. lastRow] ls
+
+checkWinRowValues :: [Float] -> [(Float, Float)] -> Bool
+checkWinRowValues _ [] = False
+checkWinRowValues [] ls = False
+checkWinRowValues ks@(x : xs) ls
+  | longestStreak >= 4 = True
+  | otherwise = checkWinRowValues xs ls
+ where
+  longestStreak = getLongestStreak $ reduceToColumnValue $ filterByRow x ls
+
+checkWinDiag :: [(Float, Float)] -> Bool
+checkWinDiag ls = False
+
+getLongestStreak :: [Float] -> Int
+getLongestStreak [] = 0
+getLongestStreak ls = maximum . map length . group . zipWith (-) [1 ..] $ map (/ step) ls
+
+reduceToColumnValue :: [(Float, Float)] -> [Float]
+reduceToColumnValue = map fst
+
+reduceToRowValue :: [(Float, Float)] -> [Float]
+reduceToRowValue = map snd
 
 filterByColumn :: Float -> [(Float, Float)] -> [(Float, Float)]
 filterByColumn x [] = []
@@ -188,12 +226,6 @@ filterByColumn x ls = sortOn snd $ filter ((== x * step) . fst) ls
 filterByRow :: Float -> [(Float, Float)] -> [(Float, Float)]
 filterByRow x [] = []
 filterByRow x ls = sortOn fst $ filter ((== x * step) . snd) ls
-
-checkRow :: [(Float, Float)] -> Bool
-checkRow ls = True
-
-checkDiag :: [(Float, Float)] -> Bool
-checkDiag ls = True
 
 displayTextTop :: String -> Picture
 displayTextTop s = Translate (negate $ step * 3) (step * 5) $ Scale 0.1 0.1 $ Text s
