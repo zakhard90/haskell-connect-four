@@ -11,18 +11,18 @@ module Main where
 -- [x] Display text
 -- [x] Place piece action
 -- [x] Alternate player turns
--- [ ] Connect 4 / win
--- [ ] Game over
+-- [x] Connect 4 / win
+-- [x] Game over
 -- [ ] Random opponent
 
 import Data.List (group, sortOn)
+import Debug.Trace
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
 
 main :: IO ()
 main = do
-  print $ getLongestStreak [-90, -60, -30, 0, 60, 90]
-  print $ filterByColumn 1 [(30, 90), (30, -30), (90, 0)]
+
   play windowDisplay white frames initGame renderGame inputHandler runGame
 
 data Game = Game
@@ -134,7 +134,7 @@ initGame =
 renderGame :: Game -> Picture
 renderGame game
   | isGameOver game = displayTextCenter "Game over"
-  | isWinner game = displayTextCenter "You did it!"
+  | isWinner game = displayTextCenter "Well done!"
   | otherwise =
     Pictures
       [ refGrid cols rows (Color (greyN 0.95) $ Circle $ radius + 4)
@@ -178,7 +178,7 @@ checkWin :: [(Float, Float)] -> Bool
 checkWin [] = False
 checkWin xs
   | length xs < 4 = False
-  | otherwise = checkWinColumn xs || checkWinRow xs || checkWinDiag xs
+  | otherwise = checkWinColumn xs || checkWinRow xs || checkWinDiagRight xs || checkWinDiagLeft xs
 
 checkWinColumn :: [(Float, Float)] -> Bool
 checkWinColumn [] = False
@@ -206,8 +206,57 @@ checkWinRowValues ks@(x : xs) ls
  where
   longestStreak = getLongestStreak $ reduceToColumnValue $ filterByRow x ls
 
-checkWinDiag :: [(Float, Float)] -> Bool
-checkWinDiag ls = False
+checkWinDiagRight :: [(Float, Float)] -> Bool
+checkWinDiagRight [] = False
+checkWinDiagRight ls = (>= 4) $ length $ scanDiagonalRight [firstCol .. lastCol] [firstRow .. lastRow] ls
+
+checkWinDiagLeft :: [(Float, Float)] -> Bool
+checkWinDiagLeft [] = False
+checkWinDiagLeft ls = (>= 4) $ length $ scanDiagonalLeft (reverse [firstCol .. lastCol]) [firstRow .. lastRow] ls
+
+scanDiagonalRight :: [Float] -> [Float] -> [(Float, Float)] -> [(Float, Float)]
+scanDiagonalRight [] _ _ = []
+scanDiagonalRight ks@(x : xs) rs ls
+  | (>= 4) $ length diag = trace ("diagRight" ++ show diag) diag
+  | otherwise = scanDiagonalRight xs rs ls
+ where
+  diag = diagonalRight x rs ls
+
+diagonalRight :: Float -> [Float] -> [(Float, Float)] -> [(Float, Float)]
+diagonalRight _ [] _ = []
+diagonalRight _ [y] _ = []
+diagonalRight _ _ [] = []
+diagonalRight x (y : ys) ls
+  | hasNextRight = getThis ++ diagonalRight (x + 1) ys ls
+  | otherwise = getThis ++ diagonalRight x ys ls
+ where
+  hasNextRight = (> 0) $ length getNextRight
+  getNextRight = getByCoordinates (x + 1) (y + 1) ls
+  getThis = getByCoordinates x y ls
+
+scanDiagonalLeft :: [Float] -> [Float] -> [(Float, Float)] -> [(Float, Float)]
+scanDiagonalLeft [] _ _ = []
+scanDiagonalLeft ks@(x : xs) rs ls
+  | (>= 4) $ length diag = trace ("diagLeft" ++ show diag) diag
+  | otherwise = scanDiagonalLeft xs rs ls
+ where
+  diag = diagonalLeft x rs ls
+
+diagonalLeft :: Float -> [Float] -> [(Float, Float)] -> [(Float, Float)]
+diagonalLeft _ [] _ = []
+diagonalLeft _ [y] _ = []
+diagonalLeft _ _ [] = []
+diagonalLeft x (y : ys) ls
+  | hasNextLeft = getThis ++ diagonalLeft (x - 1) ys ls
+  | otherwise = getThis ++ diagonalLeft x ys ls
+ where
+  hasNextLeft = (> 0) $ length getNextLeft
+  getNextLeft = getByCoordinates (x - 1) (y + 1) ls
+  getThis = getByCoordinates x y ls
+
+getByCoordinates :: Float -> Float -> [(Float, Float)] -> [(Float, Float)]
+getByCoordinates _ _ [] = []
+getByCoordinates x y ls = filterByRow y $ filterByColumn x ls
 
 getLongestStreak :: [Float] -> Int
 getLongestStreak [] = 0
@@ -231,7 +280,7 @@ displayTextTop :: String -> Picture
 displayTextTop s = Translate (negate $ step * 3) (step * 5) $ Scale 0.1 0.1 $ Text s
 
 displayTextCenter :: String -> Picture
-displayTextCenter s = Translate (-40) 0 $ Scale 0.1 0.1 $ Text s
+displayTextCenter s = Translate (-35) 0 $ Scale 0.1 0.1 $ Text s
 
 displayPlayer :: Game -> Picture
 displayPlayer game
