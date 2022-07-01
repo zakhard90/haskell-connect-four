@@ -208,16 +208,16 @@ checkWinRowValues ks@(x : xs) ls
 
 checkWinDiagRight :: [(Float, Float)] -> Bool
 checkWinDiagRight [] = False
-checkWinDiagRight ls = (>= 4) $ length $ scanDiagonalRight [firstCol .. lastCol] [firstRow .. lastRow] ls
+checkWinDiagRight ls = (>= 3) $ length $ scanDiagonalRight [firstCol .. lastCol] [firstRow .. lastRow] ls
 
 checkWinDiagLeft :: [(Float, Float)] -> Bool
 checkWinDiagLeft [] = False
-checkWinDiagLeft ls = (>= 4) $ length $ scanDiagonalLeft (reverse [firstCol .. lastCol]) [firstRow .. lastRow] ls
+checkWinDiagLeft ls = (>= 3) $ length $ scanDiagonalLeft (reverse [firstCol .. lastCol]) [firstRow .. lastRow] ls
 
 scanDiagonalRight :: [Float] -> [Float] -> [(Float, Float)] -> [(Float, Float)]
 scanDiagonalRight [] _ _ = []
 scanDiagonalRight ks@(x : xs) rs ls
-  | (>= 4) $ length diag = trace ("diagRight" ++ show diag) diag
+  | (>= 3) $ length diag = diag
   | otherwise = scanDiagonalRight xs rs ls
  where
   diag = diagonalRight x rs ls
@@ -228,7 +228,7 @@ diagonalRight _ [y] _ = []
 diagonalRight _ _ [] = []
 diagonalRight x (y : ys) ls
   | hasNextRight = getThis ++ diagonalRight (x + 1) ys ls
-  | otherwise = getThis ++ diagonalRight x ys ls
+  | otherwise = diagonalRight x ys ls
  where
   hasNextRight = (> 0) $ length getNextRight
   getNextRight = getByCoordinates (x + 1) (y + 1) ls
@@ -237,7 +237,7 @@ diagonalRight x (y : ys) ls
 scanDiagonalLeft :: [Float] -> [Float] -> [(Float, Float)] -> [(Float, Float)]
 scanDiagonalLeft [] _ _ = []
 scanDiagonalLeft ks@(x : xs) rs ls
-  | (>= 4) $ length diag = trace ("diagLeft" ++ show diag) diag
+  | (>= 3) $ length diag = diag
   | otherwise = scanDiagonalLeft xs rs ls
  where
   diag = diagonalLeft x rs ls
@@ -248,7 +248,7 @@ diagonalLeft _ [y] _ = []
 diagonalLeft _ _ [] = []
 diagonalLeft x (y : ys) ls
   | hasNextLeft = getThis ++ diagonalLeft (x - 1) ys ls
-  | otherwise = getThis ++ diagonalLeft x ys ls
+  | otherwise = diagonalLeft x ys ls
  where
   hasNextLeft = (> 0) $ length getNextLeft
   getNextLeft = getByCoordinates (x - 1) (y + 1) ls
