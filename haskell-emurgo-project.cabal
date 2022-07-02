@@ -26,7 +26,7 @@ executable haskell-emurgo-project
 
     -- Modules included in this executable, other than Main.
     -- other-modules:
-
+        
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
     build-depends:    
