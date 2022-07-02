@@ -15,7 +15,7 @@ Rules:
 
 Use the keyboard arrows Left and Right to move the cursor. Use the Down arrow to speed up the movement.
 
-The game speed can be adjusted in the Game.conf file. The minimum speed is 1.
+The game speed can be adjusted in the Game.conf file. The minimum speed is 1. To remove the gravity effect set the speed to 0.
 
 In the current version both the Player and the Opponent are controlled by the user.
 
