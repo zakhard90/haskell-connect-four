@@ -52,7 +52,7 @@ initConfig s = Config $ read s
 -- Static configurations
 
 step :: Float
-step = 30
+step = 50
 
 rows :: Float
 rows = 6
