@@ -1,10 +1,12 @@
-# haskell-connect-four
-Haskell project for Cardano Associate course
+# Haskell Connect Four Game
+Haskell project for Emurgo Cardano Associate course
 
+To solve some GL related issues during build, try:
 
+<pre>sudo apt install libgl1-mesa-dev</pre>
 
+<pre>sudo apt install freeglut3{,-dev}</pre>
 
-sudo apt install libgl1-mesa-dev
-Then a second error showed up: Missing (or bad) C library: GLU. Solved it with:
+To run:
 
-sudo apt install freeglut3{,-dev}
+<pre>cabal run</pre>
