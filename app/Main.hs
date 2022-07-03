@@ -16,7 +16,6 @@ import Data.List (group, sortOn)
 import Debug.Trace
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
-import System.Random (mkStdGen, randomR)
 
 main :: IO ()
 main = do
@@ -31,7 +30,6 @@ main = do
     runGame
 
 newtype Config = Config {speed :: Float}
-  deriving (Read, Show)
 
 data Game = Game
   { config :: Config
@@ -42,7 +40,6 @@ data Game = Game
   , isWinner :: Bool
   , isGameOver :: Bool
   }
-  deriving (Read, Show)
 
 -- Init external configurations
 
@@ -113,7 +110,7 @@ displayTextCenter s = Translate (-35) 0 $ Scale 0.1 0.1 $ Text s
 displayPlayer :: Game -> Picture
 displayPlayer game
   | isPlayersTurn game = displayTextTop "Player 1"
-  | otherwise = displayTextTop "Opponent"
+  | otherwise = displayTextTop "Player 2"
 
 repeatBlank :: Picture -> [(Float, Float)] -> [Picture]
 repeatBlank piece = foldr (\c -> (:) (uncurry Translate c piece)) [piece]
@@ -180,11 +177,15 @@ boundedHeight y
 
 -- Winning sequence algorythm
 
+checkOverflow :: [(Float, Float)] -> Bool
+checkOverflow [] = False
+checkOverflow ls = (> 0) $ length $ filter ((> 0) . snd) ls
+
 checkWin :: [(Float, Float)] -> Bool
 checkWin [] = False
-checkWin xs
-  | length xs < 4 = False
-  | otherwise = checkWinColumn xs || checkWinRow xs || checkWinDiagRight xs || checkWinDiagLeft xs
+checkWin ls
+  | length ls < 4 = False
+  | otherwise = checkWinColumn ls || checkWinRow ls || checkWinDiagRight ls || checkWinDiagLeft ls
 
 checkWinColumn :: [(Float, Float)] -> Bool
 checkWinColumn [] = False
@@ -376,7 +377,7 @@ runGame t game
             then not $ isPlayersTurn game
             else isPlayersTurn game
       , isGameOver =
-          checkWin (opponentPieces game)
+          checkWin (opponentPieces game) || checkOverflow (playerPieces game)
       , isWinner =
-          checkWin (playerPieces game)
+          checkWin (playerPieces game) || checkOverflow (opponentPieces game)
       }
