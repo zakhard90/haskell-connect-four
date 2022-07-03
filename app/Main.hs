@@ -110,7 +110,7 @@ displayTextCenter s = Translate (-35) 0 $ Scale 0.1 0.1 $ Text s
 displayPlayer :: Game -> Picture
 displayPlayer game
   | isPlayersTurn game = displayTextTop "Player 1"
-  | otherwise = displayTextTop "Player 2"
+  | otherwise = displayTextTop "Opponent"
 
 repeatBlank :: Picture -> [(Float, Float)] -> [Picture]
 repeatBlank piece = foldr (\c -> (:) (uncurry Translate c piece)) [piece]
