@@ -70,7 +70,7 @@ windowHeight :: Float
 windowHeight = (rows + 5) * step
 
 roof :: Float
-roof = subtract radius $ windowHeight / 2
+roof = subtract (radius * 2) $ windowHeight / 2
 
 ground :: Float
 ground = negate roof
@@ -99,13 +99,16 @@ windowDisplay :: Display
 windowDisplay = InWindow "Window" (round windowWidth, round windowHeight) (100, 100)
 
 cursor :: Float -> Float -> Picture
-cursor x y = translate x y (Circle radius)
+cursor x y = translate x y (ThickCircle (radius / 2) radius)
+
+cursorColor :: Game -> Picture -> Picture
+cursorColor game cursor = if isPlayersTurn game then Color black cursor else Color red cursor
 
 displayTextTop :: String -> Picture
 displayTextTop s = Translate (negate $ step * 3) (step * 5) $ Scale 0.1 0.1 $ Text s
 
 displayTextCenter :: String -> Picture
-displayTextCenter s = Translate (-35) 0 $ Scale 0.1 0.1 $ Text s
+displayTextCenter s = Translate (-35) 60 $ Scale 0.1 0.1 $ Text s
 
 displayPlayer :: Game -> Picture
 displayPlayer game
@@ -298,6 +301,7 @@ inputHandler _ game = game
 
 moveFromIndex :: Int -> Game -> Game
 moveFromIndex i game
+  | isWinner game || isGameOver game = game
   | i == 1 =
     game
       { cursorPosition =
@@ -338,16 +342,20 @@ initGame c =
 -- Game frame rendering
 
 renderGame :: Game -> Picture
-renderGame game
+renderGame game =
+  Pictures
+    [ refGrid cols rows (Color (greyN 0.95) $ Circle $ radius + 4)
+    , gameGrid game cols rows $ ThickCircle (radius / 2) radius
+    , cursorColor game $ uncurry cursor $ cursorPosition game
+    , displayPlayer game
+    , displayEndGame game
+    ]
+
+displayEndGame :: Game -> Picture
+displayEndGame game
   | isGameOver game = displayTextCenter "Game over"
   | isWinner game = displayTextCenter "Well done!"
-  | otherwise =
-    Pictures
-      [ refGrid cols rows (Color (greyN 0.95) $ Circle $ radius + 4)
-      , gameGrid game cols rows $ ThickCircle (radius / 2) radius
-      , uncurry cursor $ cursorPosition game
-      , displayPlayer game
-      ]
+  | otherwise = displayTextCenter ""
 
 -- Game execution
 
